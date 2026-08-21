@@ -74,12 +74,18 @@
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-4 bg-blue-50/50 border-b border-slate-200 flex justify-between items-center text-sm">
+            <div class="p-4 bg-blue-50/50 border-b border-slate-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 text-sm">
                 <div class="text-slate-600">
                     💡 </span> Kaynak türü, Vade, Basit Faiz ve ZK Oranı değişkenlerini giriniz. <span class="font-semibold text-slate-700 bg-white px-2 py-1 rounded shadow-sm border border-slate-200 mx-1">Ok Tuşlarını (↑ ↓ → ←)</span> kullanarak gezinebilirsiniz.
                 </div>
                 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- TCMB Verisi İçin Yeni Sekme Butonu -->
+                    <a href="https://evds3.tcmb.gov.tr/tumSeriler/3002/bie_apifon" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm flex items-center gap-2" title="TCMB EVDS Sayfasını Yeni Sekmede Aç">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        TCMB AOFM Verisi
+                    </a>
+                    
                     <!-- Dinamik Excel Üretme Butonu -->
                     <button onclick="generateAndDownloadExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm flex items-center gap-2" title="Tabloyu Excel Olarak İndir">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -87,6 +93,7 @@
                     </button>
                 </div>
             </div>
+            
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse whitespace-nowrap">
                     <thead>
@@ -148,6 +155,8 @@
         const globalAofmInput = document.getElementById('globalAofm');
         const nemaCarpaniInput = document.getElementById('nemaCarpani');
 
+        let isEditing = false; // "Excel Edit Modu" Takipçisi
+
         function calculateRow(row) {
             let E = parseFloat(row.basit) || 0;
             let vade = parseFloat(row.vade) || 0;
@@ -186,27 +195,75 @@
             };
         }
 
-        function renderTable() {
-            // Re-render esnasında ok tuşlarıyla gezinirken imlecin kaybolmaması için odaklanılan inputu hafızaya alıyoruz
-            const activeEl = document.activeElement;
-            let activeRow = null, activeCol = null;
-            
-            if (activeEl && activeEl.tagName === 'INPUT' && activeEl.hasAttribute('data-row')) {
-                activeRow = parseInt(activeEl.getAttribute('data-row'));
-                activeCol = parseInt(activeEl.getAttribute('data-col'));
-            }
+        // Bu fonksiyon artık DOM'u silip baştan yaratmıyor, SADECE hesaplama satırlarını canlı olarak güncelliyor!
+        function updateRowCalculations(index) {
+            const row = tableData[index];
+            const res = calculateRow(row);
+            const fmt = (val) => val !== null ? val.toFixed(2) + '%' : '';
 
+            const cellBasitNetZk = document.getElementById(`cell_${index}_basit_net_zk`);
+            if(cellBasitNetZk) {
+                cellBasitNetZk.textContent = fmt(res.basit_net_zk);
+                document.getElementById(`cell_${index}_basit_nema`).textContent = fmt(res.basit_nema);
+                document.getElementById(`cell_${index}_net_zk_dahil_basit`).textContent = fmt(res.net_zk_dahil_basit);
+                document.getElementById(`cell_${index}_yillik_bilesik`).textContent = fmt(res.yillik_bilesik);
+                document.getElementById(`cell_${index}_bilesik_net_zk`).textContent = fmt(res.bilesik_net_zk);
+                document.getElementById(`cell_${index}_bilesik_nema`).textContent = fmt(res.bilesik_nema);
+                document.getElementById(`cell_${index}_net_zk_dahil_bilesik_text`).textContent = fmt(res.net_zk_dahil_bilesik);
+            }
+        }
+
+        function updateAllCalculations() {
+            tableData.forEach((_, index) => updateRowCalculations(index));
+        }
+
+        function formatElement(el) {
+            if (!el || el.value === "") return;
+            const col = parseInt(el.getAttribute('data-col'));
+            const row = parseInt(el.getAttribute('data-row'));
+            if (el.type === 'text') return; 
+
+            const val = parseFloat(el.value);
+            if (isNaN(val)) return;
+
+            if (row !== -1 && col === 1) { // Vade değeri ondalıksız
+                el.value = Math.round(val);
+            } else { // Oranlar .00 şeklinde sabitleniyor
+                el.value = val.toFixed(2);
+            }
+            handleInput(el); // Formatlanmış halini tableData'ya aktar
+        }
+
+        function handleInput(el) {
+            const row = parseInt(el.getAttribute('data-row'));
+            const col = parseInt(el.getAttribute('data-col'));
+            const val = el.value;
+
+            if (row === -1) {
+                updateAllCalculations();
+            } else {
+                let field = col === 0 ? 'name' : col === 1 ? 'vade' : col === 2 ? 'basit' : 'zk';
+                if (field === 'name') {
+                    tableData[row][field] = val;
+                } else {
+                    tableData[row][field] = val === "" ? "" : parseFloat(val);
+                }
+                updateRowCalculations(row);
+            }
+        }
+
+        function renderTable() {
             tbody.innerHTML = '';
             
             tableData.forEach((row, index) => {
                 const res = calculateRow(row);
-                
-                // Format helper for null values (NEMA empty logic)
                 const fmt = (val) => val !== null ? val.toFixed(2) + '%' : '';
+                
+                const basitVal = (row.basit !== "" && row.basit !== null && !isNaN(row.basit)) ? parseFloat(row.basit).toFixed(2) : "";
+                const zkVal = (row.zk !== "" && row.zk !== null && !isNaN(row.zk)) ? parseFloat(row.zk).toFixed(2) : "";
 
                 const tr = document.createElement('tr');
                 
-                // Zebra Deseni (Alternating Rows)
                 const isAlternate = index % 2 === 1;
                 const rowBg = isAlternate ? "bg-slate-100" : "bg-white";
                 const calcColBg = isAlternate ? "bg-slate-200/50" : "bg-slate-50/50"; 
@@ -214,30 +271,29 @@
 
                 tr.className = `${rowBg} hover:bg-slate-200/70 transition-colors group`;
                 
-                // min-w-[200px] class added to the input for the "Kaynak Türü" to prevent text truncation on mobile
+                // oninput ile anında tepki, onblur ile hücreden çıkıldığında formatlama tetiklenir
                 tr.innerHTML = `
                     <td class="p-2 border-r border-slate-200">
-                        <input type="text" data-row="${index}" data-col="0" value="${row.name}" onchange="updateData(${index}, 'name', this.value)" class="w-full min-w-[200px] bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 text-slate-700 outline-none transition-all">
+                        <input type="text" data-row="${index}" data-col="0" value="${row.name}" oninput="handleInput(this)" onblur="formatElement(this)" class="w-full min-w-[200px] bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 text-slate-700 outline-none transition-all">
                     </td>
                     <td class="p-2 border-r border-slate-200 text-center">
-                        <input type="number" data-row="${index}" data-col="1" value="${row.vade}" min="0" onchange="updateData(${index}, 'vade', this.value)" class="w-16 text-center bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
+                        <input type="number" data-row="${index}" data-col="1" value="${row.vade}" min="0" oninput="handleInput(this)" onblur="formatElement(this)" class="w-16 text-center bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
                     </td>
                     <td class="p-2 border-r border-slate-200 text-right">
-                        <input type="number" data-row="${index}" data-col="2" value="${row.basit}" step="0.1" onchange="updateData(${index}, 'basit', this.value)" class="w-20 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
+                        <input type="number" data-row="${index}" data-col="2" value="${basitVal}" step="0.1" oninput="handleInput(this)" onblur="formatElement(this)" class="w-20 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
                     </td>
                     <td class="p-2 border-r border-slate-200 text-right">
-                        <input type="number" data-row="${index}" data-col="3" value="${row.zk}" step="0.1" onchange="updateData(${index}, 'zk', this.value)" class="w-16 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
+                        <input type="number" data-row="${index}" data-col="3" value="${zkVal}" step="0.1" oninput="handleInput(this)" onblur="formatElement(this)" class="w-16 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
                     </td>
                     
-                    <!-- Calculated (Disabled) Columns -->
-                    <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.basit_net_zk)}</td>
-                    <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.basit_nema)}</td>
-                    <td class="px-4 py-3 text-right ${calcColBg} text-slate-800 border-r border-slate-200 font-mono font-medium text-sm">${fmt(res.net_zk_dahil_basit)}</td>
-                    <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.yillik_bilesik)}</td>
-                    <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.bilesik_net_zk)}</td>
-                    <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.bilesik_nema)}</td>
+                    <td id="cell_${index}_basit_net_zk" class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.basit_net_zk)}</td>
+                    <td id="cell_${index}_basit_nema" class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.basit_nema)}</td>
+                    <td id="cell_${index}_net_zk_dahil_basit" class="px-4 py-3 text-right ${calcColBg} text-slate-800 border-r border-slate-200 font-mono font-medium text-sm">${fmt(res.net_zk_dahil_basit)}</td>
+                    <td id="cell_${index}_yillik_bilesik" class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.yillik_bilesik)}</td>
+                    <td id="cell_${index}_bilesik_net_zk" class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.bilesik_net_zk)}</td>
+                    <td id="cell_${index}_bilesik_nema" class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.bilesik_nema)}</td>
                     <td class="px-4 py-3 text-right ${lastColBg} text-blue-700 font-bold font-mono text-sm relative">
-                        ${fmt(res.net_zk_dahil_bilesik)}
+                        <span id="cell_${index}_net_zk_dahil_bilesik_text">${fmt(res.net_zk_dahil_bilesik)}</span>
                         <button onclick="removeRow(${index})" class="absolute right-1 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-0.5 shadow-sm border border-slate-300" title="Satırı Sil">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
@@ -245,25 +301,6 @@
                 `;
                 tbody.appendChild(tr);
             });
-
-            // Re-render işleminden sonra hafızadaki inputa tekrar odaklanıyoruz
-            if (activeRow !== null && activeRow >= 0 && activeCol !== null) {
-                setTimeout(() => {
-                    const elToFocus = document.querySelector(`input[data-row="${activeRow}"][data-col="${activeCol}"]`);
-                    if (elToFocus) {
-                        elToFocus.focus();
-                    }
-                }, 0);
-            }
-        }
-
-        function updateData(index, field, value) {
-            if (field === 'name') {
-                tableData[index][field] = value;
-            } else {
-                tableData[index][field] = value === "" ? "" : parseFloat(value);
-            }
-            renderTable();
         }
 
         function addNewRow() {
@@ -276,54 +313,92 @@
             renderTable();
         }
 
-        globalAofmInput.addEventListener('input', renderTable);
-        nemaCarpaniInput.addEventListener('input', renderTable);
+        globalAofmInput.addEventListener('input', () => handleInput(globalAofmInput));
+        globalAofmInput.addEventListener('blur', () => formatElement(globalAofmInput));
+        nemaCarpaniInput.addEventListener('input', () => handleInput(nemaCarpaniInput));
+        nemaCarpaniInput.addEventListener('blur', () => formatElement(nemaCarpaniInput));
 
-        // Arrow Key Navigation Logic
+
+        
+        // Excel: Sadece ok tuşlarıyla gelindiğinde (veya tek tıkta) hücre tamamen seçili olur. Düzenleme modu kapalıdır.
+        document.addEventListener('focusin', function(e) {
+            if (e.target.tagName === 'INPUT' && e.target.hasAttribute('data-row')) {
+                isEditing = false;
+                setTimeout(() => e.target.select(), 10);
+            }
+        });
+
+        // Çift tıklanıldığında (Excel gibi) Düzenleme Moduna gir.
+        document.addEventListener('dblclick', function(e) {
+            if (e.target.tagName === 'INPUT' && e.target.hasAttribute('data-row')) {
+                isEditing = true;
+            }
+        });
+
         document.addEventListener('keydown', function(e) {
-            const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-            if (!keys.includes(e.key)) return;
-
             const target = e.target;
             if (target.tagName !== 'INPUT' || !target.hasAttribute('data-row')) return;
-
-            const isNumber = target.type === 'number';
-
-            if (isNumber && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-                e.preventDefault(); 
-            }
 
             const currentRow = parseInt(target.getAttribute('data-row')); 
             const currentCol = parseInt(target.getAttribute('data-col')); 
 
+            // Normal bir karakter girilirse (veya silme işlemi), Excel gibi doğrudan 'Düzenleme Modu'na geç.
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                isEditing = true;
+                return;
+            }
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                isEditing = true;
+                return;
+            }
+
+            // Enter tuşu: Formatla, hesapla ve HÜCREDE KAL (Düzenleme Modunu kapat)
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                formatElement(target); // anında virgülden sonra 2 basamağa çevirir (.00)
+                isEditing = false;
+                target.select(); // Enter sonrası hücreyi seçili tut, ok tuşuyla hücre atlansın.
+                return;
+            }
+
+            const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+            if (!keys.includes(e.key)) return;
+
+            // Yazı Düzenleme Modundayken Sol ve Sağ Oklar SADECE basamaklar arasında gezinir
+            if (isEditing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                return; // Default eylem gerçekleşir (Text içi hareket)
+            }
+
+            // Aşağı/Yukarı oklar VEYA Düzenleme modunda değilken Sağ/Sol Oklar: Hücreyi değiştir
+            e.preventDefault();
+
+            // Geçmeden önce bulunduğumuz hücreyi yine de formatlayalım.
+            formatElement(target);
+
             let nextRow = currentRow;
             let nextCol = currentCol;
 
-            if (e.key === 'ArrowUp') {
-                nextRow--;
-            } else if (e.key === 'ArrowDown') {
-                nextRow++;
-            } else if (e.key === 'ArrowLeft') {
-                if (target.type === 'text' && target.selectionStart > 0) return; 
+            if (e.key === 'ArrowUp') nextRow--;
+            if (e.key === 'ArrowDown') nextRow++;
+            
+            if (e.key === 'ArrowLeft') {
                 nextCol--;
-                e.preventDefault(); 
-            } else if (e.key === 'ArrowRight') {
-                if (target.type === 'text' && target.selectionEnd < target.value.length) return; 
+                if (nextCol < 0) {
+                    nextRow--;
+                    nextCol = (nextRow === -1) ? 1 : 3; 
+                }
+            }
+            
+            if (e.key === 'ArrowRight') {
                 nextCol++;
-                e.preventDefault();
+                let maxColCurrent = (currentRow === -1) ? 1 : 3;
+                if (nextCol > maxColCurrent) {
+                    nextRow++;
+                    nextCol = 0;
+                }
             }
 
-            if (nextCol < 0) {
-                nextRow--;
-                nextCol = (nextRow === -1) ? 1 : 3; 
-            }
-
-            let maxColCurrent = (currentRow === -1) ? 1 : 3;
-            if (nextCol > maxColCurrent && e.key === 'ArrowRight') {
-                nextRow++;
-                nextCol = 0;
-            }
-
+            // Sınır Kontrolleri
             if (nextRow < -1) return; 
             if (nextRow >= tableData.length) return; 
 
@@ -335,12 +410,12 @@
 
             let maxColNext = (nextRow === -1) ? 1 : 3;
             if (nextCol > maxColNext) nextCol = maxColNext;
+            if (nextCol < 0) nextCol = 0;
 
             const nextInput = document.querySelector(`input[data-row="${nextRow}"][data-col="${nextCol}"]`);
             
             if (nextInput) {
-                nextInput.focus();
-                setTimeout(() => nextInput.select(), 10); 
+                nextInput.focus(); // focuslandığı anda focusin eventi çalışıp otomatik seçecek
             }
         });
 
