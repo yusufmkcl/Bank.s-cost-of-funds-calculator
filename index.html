@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaynak Maliyeti Hesaplama</title>
+    <title>Cost of Funds Calculator</title>
     <!-- Tailwind CSS for rapid styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -31,7 +31,7 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8; 
         }
-        /* Sayı inputlarındaki varsayılan yukarı/aşağı ok simgelerini tamamen kaldırır */
+        /* Remove arrows from number inputs for cleaner look */
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -49,7 +49,7 @@
         <!-- Header Section -->
         <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-slate-900">Kaynak Maliyeti Hesaplama</h1>
+                <h1 class="text-2xl font-bold text-slate-900">Cost of Funds Calculator</h1>
                 <p class="text-sm text-slate-500 mt-1">Kaynak Türlerine Göre Basit ve Bileşik Maliyet Tablosu (Ref: 190826.xlsx)</p>
             </div>
             
@@ -58,7 +58,6 @@
                     <div class="flex flex-col">
                         <label for="globalAofm" class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Güncel AOFM (%)</label>
                         <div class="flex items-center mt-1">
-                            <!-- Navigasyon için data-row="-1" ve data-col eklendi -->
                             <input type="number" id="globalAofm" data-row="-1" data-col="0" value="40.00" step="0.25" class="w-24 px-3 py-1.5 rounded border border-slate-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-right font-bold text-slate-900 bg-white transition-all">
                             <span class="ml-2 text-slate-500 font-medium">%</span>
                         </div>
@@ -66,7 +65,6 @@
                     <div class="flex flex-col border-l border-slate-200 pl-4">
                         <label for="nemaCarpani" class="text-xs font-semibold text-slate-600 uppercase tracking-wide" title="TCMB'nin AOFM üzerinden ZK'ya ödediği faiz oranı">Nema Çarpanı (%)</label>
                         <div class="flex items-center mt-1">
-                            <!-- Navigasyon için data-row="-1" ve data-col eklendi -->
                             <input type="number" id="nemaCarpani" data-row="-1" data-col="1" value="86.00" step="1.0" class="w-24 px-3 py-1.5 rounded border border-slate-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-right font-bold text-slate-900 bg-white transition-all">
                             <span class="ml-2 text-slate-500 font-medium">%</span>
                         </div>
@@ -82,6 +80,7 @@
                 </div>
                 
                 <div class="flex items-center gap-2">
+                    <!-- Dinamik Excel Üretme Butonu -->
                     <button onclick="generateAndDownloadExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm flex items-center gap-2" title="Tabloyu Excel Olarak İndir">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         Excel İçin İndir
@@ -131,7 +130,7 @@
     </div>
 
     <script>
-        // Tablo Başlangıç Verileri
+        // Exact dataset
         let tableData = [
             { name: "Vadeli Mevduat (1 Ay)", vade: 32, basit: 41.0, zk: 17.0 },
             { name: "Vadeli Mevduat (3 Ay)", vade: 91, basit: 41.0, zk: 17.0 },
@@ -201,9 +200,13 @@
             
             tableData.forEach((row, index) => {
                 const res = calculateRow(row);
+                
+                // Format helper for null values (NEMA empty logic)
                 const fmt = (val) => val !== null ? val.toFixed(2) + '%' : '';
 
                 const tr = document.createElement('tr');
+                
+                // Zebra Deseni (Alternating Rows)
                 const isAlternate = index % 2 === 1;
                 const rowBg = isAlternate ? "bg-slate-100" : "bg-white";
                 const calcColBg = isAlternate ? "bg-slate-200/50" : "bg-slate-50/50"; 
@@ -211,10 +214,10 @@
 
                 tr.className = `${rowBg} hover:bg-slate-200/70 transition-colors group`;
                 
-                // data-row ve data-col öznitelikleri, ok tuşlarıyla navigasyonu yönetmek için hücrelere eklendi
+                // min-w-[200px] class added to the input for the "Kaynak Türü" to prevent text truncation on mobile
                 tr.innerHTML = `
                     <td class="p-2 border-r border-slate-200">
-                        <input type="text" data-row="${index}" data-col="0" value="${row.name}" onchange="updateData(${index}, 'name', this.value)" class="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 text-slate-700 outline-none transition-all">
+                        <input type="text" data-row="${index}" data-col="0" value="${row.name}" onchange="updateData(${index}, 'name', this.value)" class="w-full min-w-[200px] bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 text-slate-700 outline-none transition-all">
                     </td>
                     <td class="p-2 border-r border-slate-200 text-center">
                         <input type="number" data-row="${index}" data-col="1" value="${row.vade}" min="0" onchange="updateData(${index}, 'vade', this.value)" class="w-16 text-center bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
@@ -226,6 +229,7 @@
                         <input type="number" data-row="${index}" data-col="3" value="${row.zk}" step="0.1" onchange="updateData(${index}, 'zk', this.value)" class="w-16 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-1 outline-none transition-all">
                     </td>
                     
+                    <!-- Calculated (Disabled) Columns -->
                     <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.basit_net_zk)}</td>
                     <td class="px-4 py-3 text-right ${calcColBg} text-slate-600 border-r border-slate-200 font-mono text-sm">${fmt(res.basit_nema)}</td>
                     <td class="px-4 py-3 text-right ${calcColBg} text-slate-800 border-r border-slate-200 font-mono font-medium text-sm">${fmt(res.net_zk_dahil_basit)}</td>
@@ -242,7 +246,7 @@
                 tbody.appendChild(tr);
             });
 
-            // Re-render işleminden sonra hafızadaki inputa tekrar odaklanıyoruz (Sadece tablo satırlarındaysa)
+            // Re-render işleminden sonra hafızadaki inputa tekrar odaklanıyoruz
             if (activeRow !== null && activeRow >= 0 && activeCol !== null) {
                 setTimeout(() => {
                     const elToFocus = document.querySelector(`input[data-row="${activeRow}"][data-col="${activeCol}"]`);
@@ -275,23 +279,22 @@
         globalAofmInput.addEventListener('input', renderTable);
         nemaCarpaniInput.addEventListener('input', renderTable);
 
+        // Arrow Key Navigation Logic
         document.addEventListener('keydown', function(e) {
             const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
             if (!keys.includes(e.key)) return;
 
             const target = e.target;
-            // Sadece navigasyon datasina sahip inputlarda çalışır
             if (target.tagName !== 'INPUT' || !target.hasAttribute('data-row')) return;
 
             const isNumber = target.type === 'number';
 
-            // EN ÖNEMLİ KISIM: Sayı inputlarında varsayılan yukarı/aşağı değer artırma/azaltma davranışını engelliyoruz
             if (isNumber && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                 e.preventDefault(); 
             }
 
-            const currentRow = parseInt(target.getAttribute('data-row')); // -1 Global, 0+ Tablo
-            const currentCol = parseInt(target.getAttribute('data-col')); // 0'dan 3'e kadar
+            const currentRow = parseInt(target.getAttribute('data-row')); 
+            const currentCol = parseInt(target.getAttribute('data-col')); 
 
             let nextRow = currentRow;
             let nextCol = currentCol;
@@ -301,53 +304,42 @@
             } else if (e.key === 'ArrowDown') {
                 nextRow++;
             } else if (e.key === 'ArrowLeft') {
-                // Metin kutusundaysa ve imleç en başta değilse standart sola kaydırmaya izin ver
                 if (target.type === 'text' && target.selectionStart > 0) return; 
                 nextCol--;
                 e.preventDefault(); 
             } else if (e.key === 'ArrowRight') {
-                // Metin kutusundaysa ve imleç en sonda değilse standart sağa kaydırmaya izin ver
                 if (target.type === 'text' && target.selectionEnd < target.value.length) return; 
                 nextCol++;
                 e.preventDefault();
             }
 
-            // Sol sınırdan çıkıldığında bir üst satırın sonuna geç
             if (nextCol < 0) {
                 nextRow--;
                 nextCol = (nextRow === -1) ? 1 : 3; 
             }
 
-            // Sağ sınırdan çıkıldığında bir alt satırın başına geç
             let maxColCurrent = (currentRow === -1) ? 1 : 3;
             if (nextCol > maxColCurrent && e.key === 'ArrowRight') {
                 nextRow++;
                 nextCol = 0;
             }
 
-            // Sınır korumaları
-            if (nextRow < -1) return; // Global parametrelerin üstü yok
-            if (nextRow >= tableData.length) return; // Tablonun son satırının altı yok
+            if (nextRow < -1) return; 
+            if (nextRow >= tableData.length) return; 
 
-            // Global Parametreler (-1) ile Tablo (0) arası geçişteki hizalamalar
             if (currentRow === -1 && nextRow === 0 && e.key === 'ArrowDown') {
-                // Global AOFM'den aşağı basınca Basit Faiz'e (2), Nema'dan ZK'ya (3) insin
                 nextCol = (currentCol === 0) ? 2 : 3; 
             } else if (currentRow === 0 && nextRow === -1 && e.key === 'ArrowUp') {
-                // Tablodan yukarı çıkarken ilgili global kutuya hizala
                 nextCol = (currentCol <= 1) ? 0 : 1; 
             }
 
-            // Varılacak satırdaki max kolon sınırını aşmasını engelle
             let maxColNext = (nextRow === -1) ? 1 : 3;
             if (nextCol > maxColNext) nextCol = maxColNext;
 
-            // Hedef hücreyi bul ve odaklan
             const nextInput = document.querySelector(`input[data-row="${nextRow}"][data-col="${nextCol}"]`);
             
             if (nextInput) {
                 nextInput.focus();
-                // Hızlı düzenleme için içindeki yazıyı seç (Excel benzeri hissiyat)
                 setTimeout(() => nextInput.select(), 10); 
             }
         });
@@ -386,7 +378,7 @@
             const whiteText = 'FFFFFFFF';
             const blackText = 'FF000000';
 
-            worksheet.mergeCells('B2:L2');
+            worksheet.mergeCells('B2:L2'); 
             const titleCell = worksheet.getCell('B2');
             titleCell.value = 'KAYNAK TÜRLERİNE GÖRE BASİT BİLEŞİK MALİYET HESAPLAMA';
             titleCell.font = { name: 'Calibri', bold: true, size: 14, color: { argb: whiteText } };
@@ -433,6 +425,7 @@
                 cell.font = { name: 'Calibri', bold: true, size: 12, color: { argb: h.color } };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: h.bg } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                
                 cell.border = { bottom: { style: 'medium', color: { argb: 'FF000000' } } };
             });
 
@@ -444,7 +437,7 @@
                 
                 const cellMappings = {
                     'B': { val: rowData.vade, align: 'center', format: '0' },
-                    'C': { val: rowData.name, align: 'left', format: '@' },
+                    'C': { val: rowData.name, align: 'left', format: '@' }, 
                     'F': { val: rowData.basit / 100, align: 'center', format: '0.00%' },
                     'G': { val: res.basit_net_zk / 100, align: 'center', format: '0.00%' },
                     'H': { val: res.net_zk_dahil_basit / 100, align: 'center', format: '0.00%' },
